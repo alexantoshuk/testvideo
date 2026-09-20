@@ -1,0 +1,133 @@
+{
+  "name": "testvideo",
+  "version": "0.1.0",
+  "description": "Synthetic A/V sync plates: burn-in timecode/frame/meta, soft ticks @0.5s and loud @2s with matching flashes. Expand fps[] \u00d7 variants[] \u2192 clip id `{avc|hevc}_1080p_{fpsId}_{variantId}`.",
+  "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.1.0",
+  "resolution": {
+    "width": 1920,
+    "height": 1080
+  },
+  "template": {
+    "durationSec": 60.0,
+    "softTickSec": 0.5,
+    "loudTickSec": 2.0,
+    "audio": {
+      "codec": "aac",
+      "channels": 1,
+      "sampleRate": 48000,
+      "pattern": {
+        "softTickSec": 0.5,
+        "loudTickSec": 2.0,
+        "alignedAt": 0.0
+      }
+    },
+    "burnIn": [
+      "timecode (pts hms)",
+      "presentation frame index",
+      "fps label",
+      "encode metadata",
+      "tick flash (soft bar + loud wash + corner pulse)"
+    ]
+  },
+  "fps": [
+    {
+      "id": "24",
+      "rate": "24",
+      "label": "24"
+    },
+    {
+      "id": "60",
+      "rate": "60",
+      "label": "60"
+    },
+    {
+      "id": "2997",
+      "rate": "30000/1001",
+      "label": "29.97"
+    }
+  ],
+  "variants": [
+    {
+      "id": "gop12_bf0",
+      "codec": "avc1",
+      "container": "mp4",
+      "gop": 12,
+      "bFrames": 0,
+      "keyMode": "fixed",
+      "purpose": [
+        "smoke",
+        "av-sync",
+        "seek"
+      ],
+      "notes": null
+    },
+    {
+      "id": "gop12_bf2",
+      "codec": "avc1",
+      "container": "mp4",
+      "gop": 12,
+      "bFrames": 2,
+      "keyMode": "fixed",
+      "purpose": [
+        "b-frames",
+        "av-sync",
+        "scrub"
+      ],
+      "notes": null
+    },
+    {
+      "id": "gop48_bf0",
+      "codec": "avc1",
+      "container": "mp4",
+      "gop": 48,
+      "bFrames": 0,
+      "keyMode": "fixed",
+      "purpose": [
+        "long-gop",
+        "av-sync",
+        "scrub-settle"
+      ],
+      "notes": null
+    },
+    {
+      "id": "scenecut_bf0",
+      "codec": "avc1",
+      "container": "mp4",
+      "gop": null,
+      "bFrames": 0,
+      "keyMode": "scenecut",
+      "purpose": [
+        "variable-keys",
+        "av-sync"
+      ],
+      "notes": "Background hue shifts every 2s to encourage scenecuts."
+    },
+    {
+      "id": "fmp4_gop12_bf0",
+      "codec": "avc1",
+      "container": "fmp4",
+      "gop": 12,
+      "bFrames": 0,
+      "keyMode": "fixed",
+      "purpose": [
+        "fmp4",
+        "progressive-open",
+        "av-sync"
+      ],
+      "notes": null
+    },
+    {
+      "id": "hevc_gop12_bf0",
+      "codec": "hvc1",
+      "container": "mp4",
+      "gop": 12,
+      "bFrames": 0,
+      "keyMode": "fixed",
+      "purpose": [
+        "hevc-key-verify",
+        "av-sync"
+      ],
+      "notes": "Skipped if libx265 is unavailable."
+    }
+  ]
+}

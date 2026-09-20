@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/testvideo/manifest.schema.json",
+  "title": "testvideo manifest",
+  "type": "object",
+  "required": ["name", "version", "resolution", "fps", "variants", "template"],
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "baseUrlHint": { "type": "string" },
+    "resolution": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "template": {
+      "type": "object",
+      "properties": {
+        "durationSec": { "type": "number" },
+        "softTickSec": { "type": "number" },
+        "loudTickSec": { "type": "number" },
+        "audio": { "type": "object" },
+        "burnIn": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "fps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "rate", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+$" },
+          "rate": {
+            "type": "string",
+            "description": "ffmpeg rate string, e.g. 24 or 30000/1001"
+          },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/variant" }
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "required": ["id", "codec", "container", "bFrames", "keyMode", "purpose"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "codec": { "enum": ["avc1", "hvc1", "av01"] },
+        "container": { "enum": ["mp4", "fmp4", "mov"] },
+        "gop": { "type": ["integer", "null"], "minimum": 1 },
+        "bFrames": { "type": "integer", "minimum": 0 },
+        "keyMode": { "enum": ["fixed", "scenecut"] },
+        "purpose": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "notes": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
