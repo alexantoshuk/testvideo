@@ -6,10 +6,10 @@ Point a player or test harness at a published GitHub Release. Prefer **HTTP Rang
 
 | Var | Meaning |
 | --- | ------- |
-| `TESTVIDEO_BASE` | e.g. `https://github.com/alexantoshuk/testvideo/releases/download/v0.1.0` |
+| `TESTVIDEO_BASE` | e.g. `https://github.com/alexantoshuk/testvideo/releases/download/v0.2.0` |
 | `TESTVIDEO_MANIFEST` | optional path/URL to `manifest.json` |
 
-Clip URL: `{TESTVIDEO_BASE}/{clipId}.mp4` (see expand below).
+Clip URL: `{TESTVIDEO_BASE}/{asset}` — usually `{clipId}.mp4`, PCM QT plates use `.mov` (see expand).
 
 ## Expand fps × variants
 
@@ -18,16 +18,24 @@ def expand(manifest: dict) -> list[dict]:
     clips = []
     w = manifest["resolution"]["width"]
     h = manifest["resolution"]["height"]
-    for fps in manifest["fps"]:
-        for var in manifest["variants"]:
+    fps_by_id = {f["id"]: f for f in manifest["fps"]}
+    for var in manifest["variants"]:
+        fps_ids = var.get("fpsIds")
+        fps_list = (
+            [fps_by_id[i] for i in fps_ids]
+            if fps_ids is not None
+            else list(manifest["fps"])
+        )
+        for fps in fps_list:
             prefix = "hevc" if var["codec"] == "hvc1" else "avc"
             vid = var["id"]
             if var["codec"] == "hvc1" and vid.startswith("hevc_"):
                 vid = vid[len("hevc_") :]
             cid = f"{prefix}_1080p_{fps['id']}_{vid}"
+            ext = "mov" if var["container"] == "mov" else "mp4"
             clips.append({
                 "id": cid,
-                "asset": f"{cid}.mp4",
+                "asset": f"{cid}.{ext}",
                 "fps": fps,
                 "variant": var,
                 "width": w,
@@ -40,7 +48,7 @@ def fixture_url(clip: dict, base: str) -> str:
     return f"{base.rstrip('/')}/{clip['asset']}"
 ```
 
-## Useful stems (v0.1.0)
+## Useful stems (v0.2.0)
 
 Not every consumer needs the full matrix. Common picks:
 
@@ -53,6 +61,7 @@ Not every consumer needs the full matrix. Common picks:
 | variable keys (scenecut) | `avc_1080p_24_scenecut_bf0` |
 | fMP4 progressive | `avc_1080p_24_fmp4_gop12_bf0` |
 | HEVC | `hevc_1080p_24_gop12_bf0` |
+| QT MOV + PCM s24 (demux stress) | `avc_1080p_24_mov_pcm24_gop12_bf0` (`.mov`) |
 
 Full list: `python scripts/generate.py --list` or `manifest.json`.
 

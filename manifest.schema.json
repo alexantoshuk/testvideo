@@ -25,7 +25,8 @@
         "loudTickSec": { "type": "number" },
         "audio": { "type": "object" },
         "burnIn": { "type": "array", "items": { "type": "string" } }
-      }
+      },
+      "description": "Defaults for AAC plates; variants may override audio / fpsIds."
     },
     "fps": {
       "type": "array",
@@ -65,7 +66,23 @@
           "items": { "type": "string" },
           "minItems": 1
         },
-        "notes": { "type": ["string", "null"] }
+        "notes": { "type": ["string", "null"] },
+        "audio": {
+          "type": "string",
+          "enum": ["aac", "pcm_s16le", "pcm_s24le"],
+          "default": "aac"
+        },
+        "audioChannels": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "fpsIds": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9]+$" },
+          "minItems": 1,
+          "description": "If set, only these fps[].id values are expanded for this variant."
+        }
       }
     }
   }

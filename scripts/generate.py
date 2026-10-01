@@ -65,9 +65,14 @@ class Variant:
     b_frames: int
     key_mode: str  # "fixed" | "scenecut"
     codec: str  # "avc1" | "hvc1"
-    container: str  # "mp4" | "fmp4"
+    container: str  # "mp4" | "fmp4" | "mov"
     purpose: list[str]
     notes: str = ""
+    # "aac" (default plates) | "pcm_s16le" | "pcm_s24le" (QT-style uncompressed)
+    audio: str = "aac"
+    audio_channels: int = 1
+    # If set, only these FPS_RATES ids are generated (PCM plates stay small).
+    fps_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,8 @@ class EncodeSpec:
     container: str
     purpose: list[str]
     notes: str = ""
+    audio: str = "aac"
+    audio_channels: int = 1
 
 
 # Frame rates — every variant is generated at each of these.
@@ -154,6 +161,22 @@ VARIANTS: list[Variant] = [
         ["hevc-key-verify", "av-sync"],
         "Skipped if libx265 is unavailable.",
     ),
+    # QT MOV + PCM: one fps only — uncompressed audio balloons size/sample tables.
+    # Purpose: demux open (re_mp4 sample explosion / chunk-coalesce), not full matrix.
+    Variant(
+        "mov_pcm24_gop12_bf0",
+        12,
+        0,
+        "fixed",
+        "avc1",
+        "mov",
+        ["pcm-demux", "qt-mov", "open"],
+        "QuickTime MOV + pcm_s24le stereo (in24). Stresses PCM sample-table demux "
+        "(~2.9M audio samples @60s). Use --duration 15 for a smaller smoke encode.",
+        audio="pcm_s24le",
+        audio_channels=2,
+        fps_ids=("24",),
+    ),
 ]
 
 
@@ -161,11 +184,22 @@ def codec_prefix(codec: str) -> str:
     return "hevc" if codec == "hvc1" else "avc"
 
 
+def asset_name(cid: str, container: str) -> str:
+    ext = "mov" if container == "mov" else "mp4"
+    return f"{cid}.{ext}"
+
+
 def expand_matrix() -> list[EncodeSpec]:
     """Cartesian product: each variant × each FPS → FullHD plate."""
     out: list[EncodeSpec] = []
-    for fps in FPS_RATES:
-        for var in VARIANTS:
+    fps_by_id = {f.id: f for f in FPS_RATES}
+    for var in VARIANTS:
+        fps_list = (
+            [fps_by_id[i] for i in var.fps_ids]
+            if var.fps_ids is not None
+            else list(FPS_RATES)
+        )
+        for fps in fps_list:
             prefix = codec_prefix(var.codec)
             # Variant ids may start with hevc_ / fmp4_; strip codec echo from filename.
             vid = var.id
@@ -175,7 +209,7 @@ def expand_matrix() -> list[EncodeSpec]:
             out.append(
                 EncodeSpec(
                     id=cid,
-                    asset=f"{cid}.mp4",
+                    asset=asset_name(cid, var.container),
                     width=WIDTH,
                     height=HEIGHT,
                     fps=fps.rate,
@@ -187,6 +221,8 @@ def expand_matrix() -> list[EncodeSpec]:
                     container=var.container,
                     purpose=list(var.purpose),
                     notes=var.notes,
+                    audio=var.audio,
+                    audio_channels=var.audio_channels,
                 )
             )
     return out
@@ -322,7 +358,7 @@ def encode(
     meta = (
         f"{spec.id}  |  {spec.codec}  {spec.width}x{spec.height}  "
         f"{spec.fps_label}fps  gop={gop_label}  bf={spec.b_frames}  "
-        f"keys={spec.key_mode}  {spec.container}"
+        f"keys={spec.key_mode}  {spec.container}  a={spec.audio}/{spec.audio_channels}ch"
     )
     meta_name = f"{spec.id}_meta.txt"
     (work / meta_name).write_text(meta + "\n", encoding="utf-8")
@@ -348,15 +384,30 @@ def encode(
         "-filter_script:v",
         vf_file.name,
         "-shortest",
-        "-c:a",
-        "aac",
-        "-ar",
-        str(SAMPLE_RATE),
-        "-ac",
-        "1",
-        "-b:a",
-        "128k",
     ]
+
+    if spec.audio == "aac":
+        cmd += [
+            "-c:a",
+            "aac",
+            "-ar",
+            str(SAMPLE_RATE),
+            "-ac",
+            str(spec.audio_channels),
+            "-b:a",
+            "128k",
+        ]
+    elif spec.audio in ("pcm_s16le", "pcm_s24le"):
+        cmd += [
+            "-c:a",
+            spec.audio,
+            "-ar",
+            str(SAMPLE_RATE),
+            "-ac",
+            str(spec.audio_channels),
+        ]
+    else:
+        raise ValueError(f"unsupported audio codec {spec.audio!r}")
 
     if spec.codec == "avc1":
         cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast"]
@@ -391,6 +442,9 @@ def encode(
 
     if spec.container == "fmp4":
         cmd += ["-movflags", "frag_keyframe+empty_moov+default_base_moof"]
+    elif spec.container == "mov":
+        # Classic QuickTime: no empty_moov / frag. +faststart keeps moov early for Range.
+        cmd += ["-movflags", "+faststart"]
     else:
         cmd += ["-movflags", "+faststart"]
 
@@ -403,14 +457,15 @@ def write_manifest(path: Path, duration: float) -> None:
     """Compact manifest: fps × variants (no exploded clip list)."""
     doc: dict[str, Any] = {
         "name": "testvideo",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "description": (
             "Synthetic A/V sync plates: burn-in timecode/frame/meta, "
             "soft ticks @0.5s and loud @2s with matching flashes. "
             "Expand fps[] × variants[] → clip id "
-            "`{avc|hevc}_1080p_{fpsId}_{variantId}`."
+            "`{avc|hevc}_1080p_{fpsId}_{variantId}` "
+            "(PCM MOV variants may limit fps via fpsIds; asset ext follows container)."
         ),
-        "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.1.0",
+        "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.2.0",
         "resolution": {"width": WIDTH, "height": HEIGHT},
         "template": {
             "durationSec": duration,
@@ -425,6 +480,10 @@ def write_manifest(path: Path, duration: float) -> None:
                     "loudTickSec": LOUD_TICK_PERIOD,
                     "alignedAt": 0.0,
                 },
+                "notes": (
+                    "Default for AAC plates. Variants may override with audio / "
+                    "audioChannels / fpsIds (see mov_pcm24_gop12_bf0)."
+                ),
             },
             "burnIn": [
                 "timecode (pts hms)",
@@ -447,13 +506,16 @@ def write_manifest(path: Path, duration: float) -> None:
                 "keyMode": v.key_mode,
                 "purpose": v.purpose,
                 "notes": v.notes or None,
+                "audio": v.audio,
+                "audioChannels": v.audio_channels,
+                **({"fpsIds": list(v.fps_ids)} if v.fps_ids is not None else {}),
             }
             for v in VARIANTS
         ],
     }
     path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
-    n = len(FPS_RATES) * len(VARIANTS)
-    print(f"wrote {path}  ({len(FPS_RATES)} fps x {len(VARIANTS)} variants = {n} clips)")
+    n = len(expand_matrix())
+    print(f"wrote {path}  ({n} clips after fpsIds filters)")
 
 
 def select_specs(only: list[str]) -> list[EncodeSpec]:
@@ -527,13 +589,18 @@ def main() -> None:
             print(spec.id)
         return
 
-    need("ffmpeg")
-    need("ffprobe")
     CLIPS_DIR.mkdir(parents=True, exist_ok=True)
-
     write_manifest(MANIFEST_PATH, duration)
     if args.manifest_only:
         return
+
+    need("ffmpeg")
+    # ffprobe optional for encode; required by verify.py
+    if not shutil.which("ffprobe"):
+        print(
+            "warning: ffprobe not on PATH (encode OK; scripts/verify.py needs it)",
+            file=sys.stderr,
+        )
 
     font = find_font()
     if font:

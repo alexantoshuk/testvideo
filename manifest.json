@@ -1,8 +1,8 @@
 {
   "name": "testvideo",
-  "version": "0.1.0",
-  "description": "Synthetic A/V sync plates: burn-in timecode/frame/meta, soft ticks @0.5s and loud @2s with matching flashes. Expand fps[] \u00d7 variants[] \u2192 clip id `{avc|hevc}_1080p_{fpsId}_{variantId}`.",
-  "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.1.0",
+  "version": "0.2.0",
+  "description": "Synthetic A/V sync plates: burn-in timecode/frame/meta, soft ticks @0.5s and loud @2s with matching flashes. Expand fps[] \u00d7 variants[] \u2192 clip id `{avc|hevc}_1080p_{fpsId}_{variantId}` (PCM MOV variants may limit fps via fpsIds; asset ext follows container).",
+  "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.2.0",
   "resolution": {
     "width": 1920,
     "height": 1080
@@ -19,7 +19,8 @@
         "softTickSec": 0.5,
         "loudTickSec": 2.0,
         "alignedAt": 0.0
-      }
+      },
+      "notes": "Default for AAC plates. Variants may override with audio / audioChannels / fpsIds (see mov_pcm24_gop12_bf0)."
     },
     "burnIn": [
       "timecode (pts hms)",
@@ -59,7 +60,9 @@
         "av-sync",
         "seek"
       ],
-      "notes": null
+      "notes": null,
+      "audio": "aac",
+      "audioChannels": 1
     },
     {
       "id": "gop12_bf2",
@@ -73,7 +76,9 @@
         "av-sync",
         "scrub"
       ],
-      "notes": null
+      "notes": null,
+      "audio": "aac",
+      "audioChannels": 1
     },
     {
       "id": "gop48_bf0",
@@ -87,7 +92,9 @@
         "av-sync",
         "scrub-settle"
       ],
-      "notes": null
+      "notes": null,
+      "audio": "aac",
+      "audioChannels": 1
     },
     {
       "id": "scenecut_bf0",
@@ -100,7 +107,9 @@
         "variable-keys",
         "av-sync"
       ],
-      "notes": "Background hue shifts every 2s to encourage scenecuts."
+      "notes": "Background hue shifts every 2s to encourage scenecuts.",
+      "audio": "aac",
+      "audioChannels": 1
     },
     {
       "id": "fmp4_gop12_bf0",
@@ -114,7 +123,9 @@
         "progressive-open",
         "av-sync"
       ],
-      "notes": null
+      "notes": null,
+      "audio": "aac",
+      "audioChannels": 1
     },
     {
       "id": "hevc_gop12_bf0",
@@ -127,7 +138,28 @@
         "hevc-key-verify",
         "av-sync"
       ],
-      "notes": "Skipped if libx265 is unavailable."
+      "notes": "Skipped if libx265 is unavailable.",
+      "audio": "aac",
+      "audioChannels": 1
+    },
+    {
+      "id": "mov_pcm24_gop12_bf0",
+      "codec": "avc1",
+      "container": "mov",
+      "gop": 12,
+      "bFrames": 0,
+      "keyMode": "fixed",
+      "purpose": [
+        "pcm-demux",
+        "qt-mov",
+        "open"
+      ],
+      "notes": "QuickTime MOV + pcm_s24le stereo (in24). Stresses PCM sample-table demux (~2.9M audio samples @60s). Use --duration 15 for a smaller smoke encode.",
+      "audio": "pcm_s24le",
+      "audioChannels": 2,
+      "fpsIds": [
+        "24"
+      ]
     }
   ]
 }
