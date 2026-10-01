@@ -18,14 +18,16 @@ python scripts/generate.py --manifest-only
 python scripts/generate.py                  # all fps × variants (~60s FullHD)
 python scripts/generate.py --only 60
 python scripts/generate.py --only gop12_bf2
-python scripts/generate.py --only mov_pcm24_gop12_bf0 --duration 15  # QT PCM stress
+python scripts/generate.py --only gop33_bf2    # long-GOP + B-frames (Play lag)
+python scripts/generate.py --only mov_pcm24_gop12_bf0 --duration 15  # QT PCM open stress
 python scripts/generate.py --duration 15    # short smoke plates
 python scripts/verify.py
 ```
 
 Outputs → `clips/` (gitignored). Ship via GitHub Releases; keep Range + CORS.
 
-PCM variant `mov_pcm24_gop12_bf0`: container `mov`, `pcm_s24le` stereo, `fpsIds: ["24"]` only — demux/open stress for sample-table explosion (not full fps matrix).
+- `gop33_bf2` — AAC mp4, GOP33, bf=2, `avcProfile: main` — full fps matrix; ChG-like Play judder/skip A/B.
+- `mov_pcm24_gop12_bf0` — `mov` + `pcm_s24le` stereo, `fpsIds: ["25"]` only — demux/open sample-table stress (not full matrix).
 
 ## Do not
 

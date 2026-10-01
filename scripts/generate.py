@@ -73,6 +73,8 @@ class Variant:
     audio_channels: int = 1
     # If set, only these FPS_RATES ids are generated (PCM plates stay small).
     fps_ids: tuple[str, ...] | None = None
+    # Optional libx264 `-profile:v` (e.g. "main" to mirror QT masters).
+    avc_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -94,11 +96,12 @@ class EncodeSpec:
     notes: str = ""
     audio: str = "aac"
     audio_channels: int = 1
+    avc_profile: str | None = None
 
 
-# Frame rates — every variant is generated at each of these.
+# Frame rates — every variant is generated at each of these (unless fpsIds).
 FPS_RATES: list[FpsRate] = [
-    FpsRate("24", "24", "24"),
+    FpsRate("25", "25", "25"),
     FpsRate("60", "60", "60"),
     FpsRate("2997", "30000/1001", "29.97"),
 ]
@@ -122,6 +125,19 @@ VARIANTS: list[Variant] = [
         "avc1",
         "mp4",
         ["b-frames", "av-sync", "scrub"],
+    ),
+    # Long GOP + B-frames (cts≠dts) — ChG-class Play judder/skip without PCM bloat.
+    Variant(
+        "gop33_bf2",
+        33,
+        2,
+        "fixed",
+        "avc1",
+        "mp4",
+        ["play-lag", "long-gop", "b-frames", "av-sync"],
+        "AVC Main GOP33 bf=2. Mirrors ChG-class masters for Play skip/judder A/B "
+        "(AAC mp4 matrix; PCM stay on mov_pcm24_gop12_bf0).",
+        avc_profile="main",
     ),
     Variant(
         "gop48_bf0",
@@ -175,7 +191,7 @@ VARIANTS: list[Variant] = [
         "(~2.9M audio samples @60s). Use --duration 15 for a smaller smoke encode.",
         audio="pcm_s24le",
         audio_channels=2,
-        fps_ids=("24",),
+        fps_ids=("25",),
     ),
 ]
 
@@ -223,6 +239,7 @@ def expand_matrix() -> list[EncodeSpec]:
                     notes=var.notes,
                     audio=var.audio,
                     audio_channels=var.audio_channels,
+                    avc_profile=var.avc_profile,
                 )
             )
     return out
@@ -411,6 +428,8 @@ def encode(
 
     if spec.codec == "avc1":
         cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast"]
+        if spec.avc_profile:
+            cmd += ["-profile:v", spec.avc_profile]
         if spec.key_mode == "fixed":
             assert spec.gop is not None
             cmd += [
@@ -457,7 +476,7 @@ def write_manifest(path: Path, duration: float) -> None:
     """Compact manifest: fps × variants (no exploded clip list)."""
     doc: dict[str, Any] = {
         "name": "testvideo",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "description": (
             "Synthetic A/V sync plates: burn-in timecode/frame/meta, "
             "soft ticks @0.5s and loud @2s with matching flashes. "
@@ -465,7 +484,7 @@ def write_manifest(path: Path, duration: float) -> None:
             "`{avc|hevc}_1080p_{fpsId}_{variantId}` "
             "(PCM MOV variants may limit fps via fpsIds; asset ext follows container)."
         ),
-        "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.2.0",
+        "baseUrlHint": "https://github.com/alexantoshuk/testvideo/releases/download/v0.3.0",
         "resolution": {"width": WIDTH, "height": HEIGHT},
         "template": {
             "durationSec": duration,
@@ -509,6 +528,7 @@ def write_manifest(path: Path, duration: float) -> None:
                 "audio": v.audio,
                 "audioChannels": v.audio_channels,
                 **({"fpsIds": list(v.fps_ids)} if v.fps_ids is not None else {}),
+                **({"avcProfile": v.avc_profile} if v.avc_profile else {}),
             }
             for v in VARIANTS
         ],
@@ -563,7 +583,7 @@ def main() -> None:
         "--only",
         action="append",
         default=[],
-        help="Clip id, fps id (24/60/2997), or variant id (repeatable).",
+        help="Clip id, fps id (25/60/2997), or variant id (repeatable).",
     )
     parser.add_argument(
         "--manifest-only",
